@@ -212,3 +212,6 @@ __marimo__/
 
 # Claude Code instructions
 CLAUDE*.md
+
+# 3D replay pages built by make viz
+viz/out/

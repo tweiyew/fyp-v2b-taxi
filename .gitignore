@@ -209,3 +209,6 @@ __marimo__/
 # PyTorch Artifacts
 .pt
 .pts
+
+# Claude Code instructions
+CLAUDE*.md

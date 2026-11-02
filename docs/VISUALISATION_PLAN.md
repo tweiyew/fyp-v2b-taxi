@@ -4,7 +4,7 @@ Written 23 Oct 2026. Status: steps 1 to 5 built on 24 Oct; step 6 waits for the 
 
 ## As built (24 Oct)
 
-- Code lives in a `viz/` package rather than `scripts/`, so the tests can import it: `viz/zones.py` (step 1), `viz/trace.py` (step 2), `viz/build.py` + `viz/template.html` (steps 3 to 5). Tests: `tests/test_viz.py`, 9 tests.
+- Code lives in a `viz/` package rather than `scripts/`, so the tests can import it: `viz/zones.py` (step 1), `viz/trace.py` (step 2), `viz/build.py` + `viz/template.html` (steps 3 to 5). Tests: `tests/test_viz.py`, 9 tests. On 30 Oct the page moved to `viz/web/replay.html` plus the scene files it shares with the live site (`docs/LIVE_SITE_PLAN.md`).
 - `make viz` records a run into `results/<RUN_ID>/` and writes `viz/out/<RUN_ID>.html` (open locally) and `viz/out/<RUN_ID>.artifact.html` (publish). `viz/out/` is gitignored.
 - `viz/zones.geojson`: 77 zones, 55 kB, simplified at 20 m.
 - Frame k is hour k: taxis where they are at the start of the hour; requests arriving in the hour; how many of those no taxi took (checked against the simulator's own rejected counter); trips completed and power drawn during the hour.

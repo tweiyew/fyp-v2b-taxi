@@ -1,0 +1,71 @@
+<div id="map" role="img" aria-label="3D map of Chicago's 77 community areas with the simulated taxi fleet"></div>
+
+<header class="clock card">
+  <div class="label" id="eyebrow">Chicago</div>
+  <h1 id="clock" class="num">&nbsp;</h1>
+  <div class="sub" id="hourOf"></div>
+</header>
+
+<div id="pick" class="card" hidden>
+  <div class="head"><strong id="pickTitle"></strong><button class="icon-btn" id="pickClose" type="button">Close</button></div>
+  <dl id="pickBody"></dl>
+</div>
+
+<aside id="panel" class="card" aria-label="This hour">
+  <section>
+    <div class="label">This hour</div>
+    <div class="tiles">
+      <div class="tile"><small>Requests</small><span class="num" id="tReq"></span></div>
+      <div class="tile"><small>No taxi took</small><span class="num" id="tRej"></span></div>
+      <div class="tile"><small>Trips completed</small><span class="num" id="tDone"></span></div>
+      <div class="tile"><small>Grid power</small><span class="num" id="tGrid"></span></div>
+    </div>
+    <div class="sub" style="color: var(--muted); font-size: 12px">Trips completed so far in this run: <span class="num" id="tDoneCum"></span></div>
+  </section>
+
+  <section>
+    <div class="label">Fleet</div>
+    <div class="fleetbar" id="fleetbar" aria-hidden="true"></div>
+    <ul class="legend" id="legend"></ul>
+  </section>
+
+  <section>
+    <div class="label">State of charge</div>
+    <div class="hist" id="hist" aria-label="Taxis by state of charge"></div>
+    <div class="hist-axis"><span>0%</span><span>50%</span><span>100%</span></div>
+    <div style="font-size: 13px">Battery health: mean <span class="num" id="sohMean"></span>, lowest <span class="num" id="sohMin"></span></div>
+  </section>
+
+  <section class="note" id="note" hidden>
+    <div class="label" style="color: var(--alarm)">What this run shows</div>
+  </section>
+
+  <section class="key">
+    <div class="label">Map key</div>
+    <div>Column height: requests in the hour (tallest: <span class="num" id="keyMax"></span> in one zone).</div>
+    <div>Column colour: requests no taxi took.</div>
+    <div class="ramp" aria-hidden="true"></div>
+    <div class="ramp-axis"><span>0</span><span id="keyRej"></span></div>
+    <div>Rings: charging stations. Their column rises with the power drawn.</div>
+    <div>Arcs: the trip each moving taxi is on.</div>
+  </section>
+
+  <section>
+    <div class="label">Run</div>
+    <dl class="run" id="run"></dl>
+  </section>
+</aside>
+
+<div class="transport card">
+  <button id="play" type="button" aria-label="Play">&#9654;</button>
+  <div class="scrub">
+    <canvas id="timeline" tabindex="0" aria-label="Requests per hour across the run; tap to jump"></canvas>
+    <input id="slider" type="range" min="0" step="1" value="0" aria-label="Hour">
+  </div>
+  <select id="speed" aria-label="Playback speed">
+    <option value="2">2 h/s</option>
+    <option value="6" selected>6 h/s</option>
+    <option value="24">1 day/s</option>
+  </select>
+  <button id="statsToggle" type="button" aria-expanded="false" aria-controls="panel">Stats</button>
+</div>

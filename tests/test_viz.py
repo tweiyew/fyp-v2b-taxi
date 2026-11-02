@@ -3,7 +3,8 @@ import json
 import pytest
 import yaml
 
-from viz.trace import STATUSES, make_policy, record, with_hours
+from viz.build import render, scene_parts
+from viz.trace import STATUSES, episode_hours, make_policy, record, with_hours
 from viz.zones import simplify_line, simplify_ring
 
 HOURS = 24
@@ -13,7 +14,14 @@ HOURS = 24
 def run():
     with open("configs/chicago_v1g.yaml") as fp:
         config = with_hours(yaml.safe_load(fp), HOURS)
-    return record(config, make_policy("EIGHTYTWENTY", None))
+    streamed = {"header": None, "hours": []}
+    result = record(
+        config,
+        make_policy("EIGHTYTWENTY", None),
+        on_start=lambda header: streamed.update(header=header),
+        on_hour=lambda time, frame: streamed["hours"].append((time, frame)),
+    )
+    return {**result, "streamed": streamed}
 
 
 def test_one_frame_per_simulated_hour(run):
@@ -53,6 +61,33 @@ def test_metrics_agree_with_the_frames(run):
     assert metrics["trips_completed"] == sum(trace["completed"])
     assert metrics["requests"] == sum(map(sum, trace["requests"]))
     assert metrics["grid_energy_kwh"] == pytest.approx(sum(trace["grid_kw"]))
+
+
+def test_streamed_frames_stacked_equal_the_trace(run):
+    trace, streamed = run["trace"], run["streamed"]
+    assert {**streamed["header"], "times": trace["times"]} == {k: trace[k] for k in [*streamed["header"], "times"]}
+    assert [time for time, _ in streamed["hours"]] == trace["times"]
+    for key in streamed["hours"][0][1]:
+        assert [frame[key] for _, frame in streamed["hours"]] == trace[key], key
+
+
+def test_episode_hours_matches_the_simulated_hours(run):
+    with open("configs/chicago_v1g.yaml") as fp:
+        config = yaml.safe_load(fp)
+    assert episode_hours(config) == 744
+    assert episode_hours(with_hours(config, HOURS)) == HOURS == len(run["trace"]["times"])
+
+
+def test_replay_page_fills_each_placeholder_once_and_leaves_the_data_alone():
+    with open("viz/web/replay.html") as fp:
+        template = fp.read()
+    trace = {"note": "__SCENE_JS__ </script>"}
+    page = render(template, {"features": []}, trace, {}, scene_parts())
+    assert page.count("window.createFleetScene = ") == 1
+    assert '{"note":"__SCENE_JS__ <\\/script>"}' in page
+    assert page.count("__SCENE_JS__") == 1  # the one inside the trace
+    for placeholder in ("__SCENE_CSS__", "__SCENE_HTML__", "__ZONES_JSON__", "__TRACE_JSON__", "__META_JSON__"):
+        assert placeholder not in page
 
 
 def test_with_hours_leaves_the_original_config_alone():

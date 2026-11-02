@@ -8,10 +8,13 @@ the same page without the document wrapper, for publishing as a claude.ai artifa
 import argparse
 import json
 import os
+import re
 from typing import Dict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLACEHOLDERS = ("__ZONES_JSON__", "__TRACE_JSON__", "__META_JSON__")
+WEB_DIR = os.path.join(HERE, "web")
+SCENE_FILES = {"__SCENE_CSS__": "scene.css", "__SCENE_HTML__": "scene.html", "__SCENE_JS__": "scene.js"}
+DATA = ("__ZONES_JSON__", "__TRACE_JSON__", "__META_JSON__")
 
 
 def _inline(obj) -> str:
@@ -19,15 +22,24 @@ def _inline(obj) -> str:
     return json.dumps(obj, separators=(",", ":")).replace("</", "<\\/")
 
 
-def render(template: str, zones: Dict, trace: Dict, meta: Dict) -> str:
-    for placeholder in PLACEHOLDERS:
+def scene_parts(web_dir: str = WEB_DIR) -> Dict[str, str]:
+    """The shared scene files (viz/web/scene.*), by the placeholder each one fills."""
+    parts = {}
+    for placeholder, name in SCENE_FILES.items():
+        with open(os.path.join(web_dir, name)) as fp:
+            parts[placeholder] = fp.read()
+    return parts
+
+
+def render(template: str, zones: Dict, trace: Dict, meta: Dict, scene: Dict[str, str]) -> str:
+    """Fill <template> with the scene files and the run's data. Each placeholder is filled
+    once, in a single pass, so text inside one part is never mistaken for another placeholder."""
+    values = {**scene, "__ZONES_JSON__": _inline(zones), "__TRACE_JSON__": _inline(trace), "__META_JSON__": _inline(meta)}
+    for placeholder in values:
         if template.count(placeholder) != 1:
             raise ValueError(f"template must contain {placeholder} exactly once")
-    return (
-        template.replace("__ZONES_JSON__", _inline(zones))
-        .replace("__TRACE_JSON__", _inline(trace))
-        .replace("__META_JSON__", _inline(meta))
-    )
+    pattern = re.compile("|".join(re.escape(p) for p in values))
+    return pattern.sub(lambda m: values[m.group(0)], template)
 
 
 def standalone(page: str) -> str:
@@ -52,8 +64,8 @@ def main() -> None:
 
     trace = load(os.path.join(args.run_dir, "trace.json"))
     meta = load(os.path.join(args.run_dir, "metrics.json"))
-    with open(os.path.join(HERE, "template.html")) as fp:
-        page = render(fp.read(), load(args.zones), trace, meta)
+    with open(os.path.join(WEB_DIR, "replay.html")) as fp:
+        page = render(fp.read(), load(args.zones), trace, meta, scene_parts())
 
     os.makedirs(args.out_dir, exist_ok=True)
     run_id = os.path.basename(os.path.normpath(args.run_dir))

@@ -12,11 +12,12 @@ import argparse
 import contextlib
 import datetime
 import json
+import math
 import os
 import subprocess
 import warnings
 from collections import Counter
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import yaml
 
@@ -32,6 +33,13 @@ def with_hours(config: Dict, hours: int) -> Dict:
     start = datetime.datetime.strptime(config["start t"], CONFIG_TIME_FORMAT)
     end = start + datetime.timedelta(hours=hours) - datetime.timedelta(seconds=1)
     return {**config, "end t": end.strftime(CONFIG_TIME_FORMAT)}
+
+
+def episode_hours(config: Dict) -> int:
+    """Number of steps an episode of <config> takes: it ends at the first tick with t >= end t."""
+    start = datetime.datetime.strptime(config["start t"], CONFIG_TIME_FORMAT)
+    end = datetime.datetime.strptime(config["end t"], CONFIG_TIME_FORMAT)
+    return math.ceil((end - start).total_seconds() / float(config["delta t"]))
 
 
 def _waiting(info: Dict) -> List[Dict]:
@@ -63,33 +71,35 @@ class TraceRecorder:
             )
         }
 
-    def add(self, after: Dict) -> None:
-        """Close the hour that started at `self.before` and ended at <after>."""
+    def add(self, after: Dict) -> Dict:
+        """Close the hour that started at `self.before` and ended at <after>; return its frame."""
         before = self.before
         fleet = before["fleet"]
-        f = self.frames
-        f["taxi_zone"].append([v["location"] for v in fleet])
-        f["taxi_dest"].append([v["destination"] for v in fleet])
-        f["taxi_status"].append([STATUSES.index(v["status"]) for v in fleet])
-        f["taxi_soc"].append([round(v["battery"]["soc"] * 100, 1) for v in fleet])
-        f["taxi_soh"].append(
-            [round(v["battery"]["actual_capacity"] / v["battery"]["initial_capacity"], 7) for v in fleet]
-        )
-
         waiting = _waiting(before)
         requests = Counter(j["pickup_location"] for j in waiting)
         still_known = {
             j["id"] for key in ("arrived", "assigned", "inprogress") for j in after[key]
         }
         rejected = Counter(j["pickup_location"] for j in waiting if j["id"] not in still_known)
-        f["requests"].append([requests.get(z, 0) for z in self.zones])
-        f["rejected"].append([rejected.get(z, 0) for z in self.zones])
-
-        f["completed"].append(after["completed"] - before["completed"])
-        f["failed"].append(after["failed"] - before["failed"])
-        f["grid_kw"].append(round(after["total_grid_power"], 3))
-        f["station_kw"].append([round(p, 3) for p in _station_power(after)])
+        frame = {
+            "taxi_zone": [v["location"] for v in fleet],
+            "taxi_dest": [v["destination"] for v in fleet],
+            "taxi_status": [STATUSES.index(v["status"]) for v in fleet],
+            "taxi_soc": [round(v["battery"]["soc"] * 100, 1) for v in fleet],
+            "taxi_soh": [
+                round(v["battery"]["actual_capacity"] / v["battery"]["initial_capacity"], 7) for v in fleet
+            ],
+            "requests": [requests.get(z, 0) for z in self.zones],
+            "rejected": [rejected.get(z, 0) for z in self.zones],
+            "completed": after["completed"] - before["completed"],
+            "failed": after["failed"] - before["failed"],
+            "grid_kw": round(after["total_grid_power"], 3),
+            "station_kw": [round(p, 3) for p in _station_power(after)],
+        }
+        for key, value in frame.items():
+            self.frames[key].append(value)
         self.before = after
+        return frame
 
     def summary(self, rejected_total: int) -> Dict:
         f = self.frames
@@ -114,15 +124,17 @@ class TraceRecorder:
             "mean_final_soh": round(sum(final_soh) / len(final_soh), 7),
         }
 
-    def trace(self, times: List[str], dt: float) -> Dict:
+    def header(self, dt: float) -> Dict:
+        """The parts of the trace that do not change from hour to hour."""
         return {
             "dt_seconds": dt,
-            "times": times,
             "zones": self.zones,
             "statuses": STATUSES,
             "stations": {"zone": self.stations, "ports": self.ports},
-            **self.frames,
         }
+
+    def trace(self, times: List[str], dt: float) -> Dict:
+        return {**self.header(dt), "times": times, **self.frames}
 
 
 def make_policy(name: str, weights: Optional[str]):
@@ -135,21 +147,34 @@ def make_policy(name: str, weights: Optional[str]):
     raise ValueError(f"Unknown policy {name!r}: use EIGHTYTWENTY or DNN")
 
 
-def record(config: Dict, policy) -> Dict:
-    """Run one episode of <config> under <policy>; return {'trace', 'metrics'}."""
+def record(
+    config: Dict,
+    policy,
+    on_start: Optional[Callable[[Dict], None]] = None,
+    on_hour: Optional[Callable[[str, Dict], None]] = None,
+) -> Dict:
+    """Run one episode of <config> under <policy>; return {'trace', 'metrics'}.
+
+    <on_start> gets the trace header before the first hour; <on_hour> gets each hour's
+    time and frame as soon as the hour is simulated.
+    """
     env = TaxiFleetSimulator(config)
     with warnings.catch_warnings(), open(os.devnull, "w") as devnull, contextlib.redirect_stdout(devnull):
         # gymnasium warns that the action bounds are cast to float32; the values are exact.
         warnings.filterwarnings("ignore", category=UserWarning, module="gymnasium.spaces.box")
         observation, info = env.reset()
         recorder = TraceRecorder(sorted(env.region.map.keys()), info)
+        if on_start:
+            on_start(recorder.header(env.dt))
         rejected_start = info["rejected"]
         times, done = [], False
         while not done:
             times.append(env.t.strftime("%Y-%m-%dT%H:%M"))
             action = policy.schedule(observation, info)
             observation, _, done, _, info = env.step(action)
-            recorder.add(info)
+            frame = recorder.add(info)
+            if on_hour:
+                on_hour(times[-1], frame)
     return {
         "trace": recorder.trace(times, env.dt),
         "metrics": recorder.summary(info["rejected"] - rejected_start),
@@ -158,6 +183,24 @@ def record(config: Dict, policy) -> Dict:
 
 def _git(*args: str) -> str:
     return subprocess.run(["git", *args], capture_output=True, text=True, check=False).stdout.strip()
+
+
+def default_run_id(config_path: str, policy: str) -> str:
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
+    return f"{datetime.datetime.now():%Y%m%d-%H%M%S}-{config_name}-{policy.lower()}"
+
+
+def provenance(run_id: str, config_path: str, policy: str, weights: Optional[str]) -> Dict:
+    """Where a run came from: its settings and the code it ran on."""
+    return {
+        "run_id": run_id,
+        "config": config_path,
+        "policy": policy.upper(),
+        "weights": weights,
+        "commit": _git("rev-parse", "HEAD"),
+        "uncommitted_changes": bool(_git("status", "--porcelain", "--", "simulator", "scheduler", "configs")),
+        "created": datetime.datetime.now().isoformat(timespec="seconds"),
+    }
 
 
 def write_run(result: Dict, config: Dict, run_dir: str, provenance: Dict) -> None:
@@ -185,22 +228,10 @@ def main() -> None:
     if args.hours:
         config = with_hours(config, args.hours)
 
-    config_name = os.path.splitext(os.path.basename(args.config))[0]
-    run_id = args.run_id or (
-        f"{datetime.datetime.now():%Y%m%d-%H%M%S}-{config_name}-{args.policy.lower()}"
-    )
+    run_id = args.run_id or default_run_id(args.config, args.policy)
     run_dir = os.path.join("results", run_id)
     result = record(config, make_policy(args.policy, args.weights))
-    provenance = {
-        "run_id": run_id,
-        "config": args.config,
-        "policy": args.policy.upper(),
-        "weights": args.weights,
-        "commit": _git("rev-parse", "HEAD"),
-        "uncommitted_changes": bool(_git("status", "--porcelain", "--", "simulator", "scheduler", "configs")),
-        "created": datetime.datetime.now().isoformat(timespec="seconds"),
-    }
-    write_run(result, config, run_dir, provenance)
+    write_run(result, config, run_dir, provenance(run_id, args.config, args.policy, args.weights))
     print(run_dir)
 
 

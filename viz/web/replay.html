@@ -1,0 +1,24 @@
+<title>Chicago Fleet Replay</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+__SCENE_CSS__
+</style>
+
+__SCENE_HTML__
+
+<script id="zones-data" type="application/json">__ZONES_JSON__</script>
+<script id="trace-data" type="application/json">__TRACE_JSON__</script>
+<script id="meta-data" type="application/json">__META_JSON__</script>
+<script src="https://unpkg.com/deck.gl@9.3.11/dist.min.js"></script>
+<script>
+__SCENE_JS__
+</script>
+<script>
+(function () {
+  const read = (id) => JSON.parse(document.getElementById(id).textContent);
+  createFleetScene(read("zones-data")).load(read("trace-data"), read("meta-data"));
+})();
+</script>

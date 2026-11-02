@@ -7,13 +7,14 @@ PY := .venv/bin/python
 CONFIG ?= configs/chicago_v1g.yaml
 POLICY ?= EIGHTYTWENTY
 WEIGHTS ?=
+PORT ?= 8765
 OUT ?= logs/$(basename $(notdir $(CONFIG)))_$(shell echo $(POLICY) | tr A-Z a-z).csv
 ifndef RUN_ID
 RUN_ID := $(shell date +%Y%m%d-%H%M%S)-$(basename $(notdir $(CONFIG)))-$(shell echo $(POLICY) | tr A-Z a-z)
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help install test run trace viz
+.PHONY: help install test run trace viz vendor serve
 
 help: ## List targets and the variables `make run` accepts
 	@grep -E '^[a-z]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  make %-8s %s\n", $$1, $$2}'
@@ -24,6 +25,7 @@ help: ## List targets and the variables `make run` accepts
 	@echo "    OUT=$(OUT)"
 	@echo "    WEIGHTS=<policy .pt file, DNN only>"
 	@echo "  make trace / make viz also take RUN_ID (default: <timestamp>-<config>-<policy>)"
+	@echo "  make serve takes PORT (default: $(PORT))"
 
 install: .venv/.installed ## Create .venv with uv and install requirements.txt
 
@@ -55,3 +57,11 @@ trace: install ## Record CONFIG with POLICY hour by hour into results/RUN_ID/
 
 viz: trace viz/zones.geojson ## Record a run and build its 3D replay page in viz/out/
 	@$(PY) -m viz.build results/$(RUN_ID)
+
+viz/web/vendor/fonts.css: viz/vendor.py
+	$(PY) -m viz.vendor
+
+vendor: viz/web/vendor/fonts.css ## Download deck.gl and the fonts once, so the live site works offline
+
+serve: install viz/zones.geojson viz/web/vendor/fonts.css ## Start the live simulation site on localhost:PORT and open it
+	@PYTHONPATH=$(CURDIR) $(PY) -m viz.server --port $(PORT) --open

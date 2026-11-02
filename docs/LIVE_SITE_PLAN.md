@@ -1,6 +1,17 @@
 # Plan: a live simulation website
 
-Written 24 Oct 2026. Status: not started. Decisions needed: see the end.
+Written 24 Oct 2026. Status: built 30 Oct (see "As built"). Decisions taken with the defaults on 30 Oct.
+
+## As built (30 Oct)
+
+- Start: `make serve` (port 8765, or `PORT=...`), which opens the browser. The first time, it runs `make vendor` to download deck.gl 9.3.11 and the fonts into `viz/web/vendor/` (gitignored); after that it works offline.
+- Code: `viz/live.py` (worker process, run manager, config and saved-run listings), `viz/server.py` (HTTP), `viz/vendor.py`. Page: `viz/web/scene.{js,css,html}` shared with the replay, `viz/web/live.{html,js,css}`, `viz/web/replay.html` (replaces `viz/template.html`).
+- Runnable configs are `chicago_v1g` and `chicago_v2g` only. `configs/chicago.yaml` names `../data/...`, which is outside the repo when run from the root; `nyc.yaml`'s data is not in `data/`.
+- Run ids: `<timestamp>-<config>-<policy>`, plus `-<hours>h` for runs shorter than the config.
+- Endpoints as planned, plus `GET /api/live`: the run still computing, so a page reloaded mid-run reattaches to it. The worker's failure event is named `failed`, because `error` is the browser's own `EventSource` connection event. Unknown run ids and paths outside `viz/web/` get 404; bad run settings get 400; a second run while one computes gets 409.
+- No polling fallback: `EventSource` reconnects by itself and the server resumes from `Last-Event-ID`.
+- The replay's two notes no longer say "all month", since a run can be a day long.
+- Checks: `tests/test_live.py` (18 tests: options, a 3-hour run streams 3 frames then saves, Stop, bad requests, paths, busy port) and 3 new tests in `tests/test_viz.py`. Screenshots at 1920 x 1080, 1400 x 900 and 500 x 860; the rebuilt replay matches the old one at 1400 x 900. Appending hours to the scene was checked in headless Chrome by feeding it the saved trace (readouts at hour 100 match `trace.json`). Not checked in a browser: playback while frames stream in (headless Chrome on this Mac fires no animation frames), and a run started from the page (the shell hook blocks POST requests).
 
 A local website for the presentation. On the page you pick a config, a policy and a length, press Run, and the simulator computes the run on your laptop while the 3D city fills in hour by hour. Every run is saved, so any run can be replayed later without computing it again. Start it with `make serve`; it opens at `http://localhost:8765` in your own browser (override with `make serve PORT=...`). Nothing goes through claude.ai.
 
@@ -10,7 +21,7 @@ It builds on the replay already in `viz/` (see `docs/VISUALISATION_PLAN.md`): th
 
 | Area | What you see and do |
 | --- | --- |
-| Run controls | Config (only those whose map and demand files exist: today `chicago_v1g`, `chicago_v2g`, `chicago`), policy (`EIGHTYTWENTY`; `DNN` only when a `.pt` weights file is present, none today), length (1 day, 1 week, the whole month). Run and Stop buttons. |
+| Run controls | Config (only those whose map and demand files exist: today `chicago_v1g` and `chicago_v2g`), policy (`EIGHTYTWENTY`; `DNN` only when a `.pt` weights file is present, none today), length (1 day, 1 week, the whole month). Run and Stop buttons. |
 | Progress | "Computing hour 312 of 744" beside the playback clock, so the audience sees the simulator working. Playback can lag behind computation; it never runs ahead of it. |
 | 3D city | As in the replay: zone columns = requests in the hour, colour = requests no taxi took, taxis by status, trip arcs, charger rings and power columns. |
 | Readouts | As in the replay: this hour's numbers, fleet by status, state of charge, battery health, and the "What this run shows" notes once the run ends. |
@@ -46,7 +57,7 @@ server:  forwards frames to the page; writes results/<id>/ when the run ends
 | # | Step | Done when |
 | --- | --- | --- |
 | 1 | `TraceRecorder.add()` returns the frame | Existing `tests/test_viz.py` passes; new test: the returned frames, stacked, equal the trace |
-| 2 | Worker process + server endpoints | Tests start the server on a free port: `/api/options` lists the three Chicago configs; a 3-hour run streams exactly 3 frames then `done`; Stop ends the worker; an unknown config or a path like `../x` is rejected with a 400 |
+| 2 | Worker process + server endpoints | Tests start the server on a free port: `/api/options` lists the runnable Chicago configs; a 3-hour run streams exactly 3 frames then `done`; Stop ends the worker; an unknown config or a path like `../x` is rejected with a 400 |
 | 3 | Run saving | A finished run leaves `results/<id>/` with `trace.json`, `config.yaml` and `metrics.json` with the commit id, identical in format to `make trace` |
 | 4 | Split the page: `scene.js` shared, replay rebuilt from it | `make viz` output looks the same as before (screenshot at 1400 x 900) |
 | 5 | Live page: controls, progress, streaming playback, saved runs | A full-month run plays from the first hour while it computes; picking a saved run replays it |

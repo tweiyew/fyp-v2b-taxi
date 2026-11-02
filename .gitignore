@@ -215,3 +215,6 @@ CLAUDE*.md
 
 # 3D replay pages built by make viz
 viz/out/
+
+# deck.gl and fonts downloaded by make vendor
+viz/web/vendor/

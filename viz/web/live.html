@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chicago Fleet Live</title>
+<link rel="stylesheet" href="/vendor/fonts.css">
+<link rel="stylesheet" href="/scene.css">
+<link rel="stylesheet" href="/live.css">
+</head>
+<body>
+__SCENE_HTML__
+
+<section id="controls" class="controls card" aria-label="Run the simulator">
+  <div class="label">Simulate</div>
+  <div class="fields">
+    <label>Config<select id="cfg"></select></label>
+    <label>Policy<select id="pol"></select></label>
+    <label>Length<select id="len"></select></label>
+  </div>
+  <div class="go">
+    <button id="runBtn" class="primary" type="button">Run</button>
+    <div class="progress">
+      <div class="num" id="progressText" role="status">Ready</div>
+      <div class="bar" aria-hidden="true"><span id="progressFill"></span></div>
+    </div>
+  </div>
+  <label class="saved">Saved runs<select id="saved"></select></label>
+  <div id="msg" class="msg" role="alert" hidden></div>
+</section>
+
+<button id="controlsToggle" class="controls-toggle" type="button" aria-expanded="false" aria-controls="controls">Simulate</button>
+
+<nav id="viewbar" class="viewbar card" aria-label="View">
+  <button type="button" data-view="city" title="Whole city (1)">City</button>
+  <button type="button" data-view="ohare" title="O'Hare close up (2)">O'Hare</button>
+  <button type="button" data-view="loop" title="The Loop close up (3)">Loop</button>
+  <span class="sep" aria-hidden="true"></span>
+  <button type="button" id="hideBtn" title="Hide or show the panels (H)">Hide panels</button>
+  <button type="button" id="fullBtn" title="Full screen (F)">Full screen</button>
+</nav>
+
+<script src="/vendor/deck.min.js"></script>
+<script src="/scene.js"></script>
+<script src="/live.js"></script>
+</body>
+</html>

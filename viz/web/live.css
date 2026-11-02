@@ -1,0 +1,80 @@
+/* Live site additions to scene.css: run controls under the clock, a view bar at the top,
+   and a "bare" mode for presenting that leaves only the map, the clock and the timeline. */
+.controls {
+  position: fixed;
+  left: var(--gutter-l);
+  top: calc(var(--top) + 104px);
+  width: min(360px, calc(100% - var(--gutter-l) - var(--gutter-r)));
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+.controls label {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+}
+.controls select { width: 100%; min-width: 0; height: 36px; padding: 0 8px; }
+.fields { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 8px; }
+.go { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; }
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1a1204;
+  font-weight: 600;
+  min-width: 72px;
+}
+button.primary.stop { background: #2a1a1c; border-color: var(--alarm); color: var(--ink); }
+button:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+.progress { display: grid; gap: 4px; min-width: 0; font-size: 13px; }
+.progress .num { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar { height: 4px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+.bar span { display: block; height: 100%; width: 0; background: var(--volt); transition: width 0.15s linear; }
+.msg {
+  font-size: 13px;
+  border-left: 3px solid var(--alarm);
+  padding: 6px 8px;
+  background: rgba(239, 106, 91, 0.08);
+  border-radius: 0 6px 6px 0;
+}
+
+/* The picked taxi or zone sits above the transport instead of under the clock. */
+#pick { top: auto; bottom: calc(var(--bottom) + 76px); }
+
+.viewbar {
+  position: fixed;
+  top: var(--top);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.viewbar button { height: 32px; padding: 0 10px; font-size: 13px; }
+.viewbar .sep { width: 1px; align-self: stretch; background: var(--rule); }
+
+body.bare #panel, body.bare #controls, body.bare #pick { display: none !important; }
+body.bare .transport { right: var(--gutter-r); }
+
+@media (max-width: 1279px) {
+  .viewbar { left: auto; right: calc(var(--gutter-r) + var(--panel-w) + 12px); transform: none; }
+}
+/* Narrow screens: the Simulate card would cover the north of the city, O'Hare included,
+   so it opens from a button at the top right. */
+.controls-toggle { display: none; }
+@media (max-width: 899px) {
+  .controls { top: calc(var(--top) + 92px); }
+  body:not(.controls-open) .controls { display: none; }
+  .controls-toggle {
+    display: block;
+    position: fixed;
+    top: var(--top);
+    right: var(--gutter-r);
+    background: var(--panel-solid);
+  }
+  .viewbar { display: none; }
+  #pick { bottom: calc(var(--bottom) + 128px); }
+}

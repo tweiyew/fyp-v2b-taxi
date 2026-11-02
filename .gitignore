@@ -218,3 +218,6 @@ viz/out/
 
 # deck.gl and fonts downloaded by make vendor
 viz/web/vendor/
+
+# Simulator logs written by make run (regenerated; experiments live in results/)
+logs/

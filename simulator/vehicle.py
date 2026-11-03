@@ -142,6 +142,7 @@ class Vehicle:
                 distance = self.location.to(self.destination)[0]
                 dW = distance * self.efficiency / 100
                 self.battery.discharge(dW, dt, conditions["T_a"])
+                self.location = self.destination
                 if self.battery.soc <= 0:
                     self.status = VehicleStatus.RECOVERY
                     self.job.fail()
@@ -157,6 +158,7 @@ class Vehicle:
                 distance = self.location.to(self.destination)[0]
                 dW = distance * self.efficiency / 100
                 self.battery.discharge(dW, dt, conditions["T_a"])
+                self.location = self.destination
                 if self.battery.soc <= 0:
                     self.status = VehicleStatus.RECOVERY
                     self.initialize_recovery_state()
@@ -170,6 +172,7 @@ class Vehicle:
                 distance = self.location.to(self.destination)[0]
                 dW = distance * self.efficiency / 100
                 self.battery.discharge(dW, dt, conditions["T_a"])
+                self.location = self.destination
                 if self.battery.soc <= 0:
                     self.status = VehicleStatus.RECOVERY
                     self.initialize_recovery_state()
@@ -181,6 +184,7 @@ class Vehicle:
                 distance = self.location.to(self.destination)[0]
                 dW = distance * self.efficiency / 100
                 self.battery.discharge(dW, dt, conditions["T_a"])
+                self.location = self.destination
                 if self.battery.soc <= 0:
                     self.status = VehicleStatus.RECOVERY
                     self.job.fail()
@@ -191,6 +195,7 @@ class Vehicle:
         elif self.status == VehicleStatus.RECOVERY:
             self.time_remaining -= dt
             if self.time_remaining <= 0:
+                self.location = self.destination  # the depot, set by initialize_recovery_state()
                 self.status = VehicleStatus.IDLE
         else:
             raise Exception(f"Invalid vehicle state: {self.status}")

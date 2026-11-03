@@ -139,6 +139,8 @@ class TaxiFleetSimulator(gym.Env):
     def get_closest_job(self, vehicle: Vehicle) -> Job:
         """
         Get the closest job to <vehicle> that is not inprogress or expired.
+        Ties go to the lowest job id, so the choice does not depend on the
+        order in which the job set happens to iterate.
         """
         closest_job = None
         distance = float('inf')
@@ -148,7 +150,7 @@ class TaxiFleetSimulator(gym.Env):
             d, t = vehicle.location.to(job.pickup_location)
             #if d == float('inf'):
             #    print(job.pickup_location.region.map[1])
-            if d < distance:
+            if d < distance or (d == distance and job.id < closest_job.id):
                 distance = d
                 closest_job = job
         return closest_job

@@ -64,3 +64,27 @@ def test_two_taxis_take_two_different_requests(env):
     assert len(jobs) == 2
     assert jobs[0] is not jobs[1]
     assert sorted(j.pickup_location.zone for j in jobs) == [1, 2]
+
+
+@pytest.mark.parametrize("order", [(0, 1), (1, 0)])
+def test_equally_close_requests_go_by_job_id_whatever_the_pool_order(env, order):
+    jobs = sorted(requests(env, 1, 1), key=lambda j: j.id)
+    env.arrived = [jobs[i] for i in order]  # a list, so the test fixes the iteration order
+    assert env.get_closest_job(env.fleet[0]) is jobs[0]
+
+
+def test_two_runs_of_the_same_config_are_identical():
+    import random
+
+    import yaml
+
+    from viz.trace import make_policy, record, with_hours
+
+    with open("configs/chicago_v1g.yaml") as fp:
+        config = with_hours(yaml.safe_load(fp), 48)
+    runs = []
+    for _ in range(2):
+        random.seed(0)  # start zones come from `random`, seeded once at import; reseed so only job order can differ
+        runs.append(record(config, make_policy("EIGHTYTWENTY", None)))
+    assert runs[0]["trace"] == runs[1]["trace"]
+    assert runs[0]["metrics"] == runs[1]["metrics"]

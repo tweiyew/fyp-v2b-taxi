@@ -2,23 +2,27 @@ import pickle
 
 import pytest
 
+from simulator.charger import ChargePort, ChargeStation
 from simulator.job import Job, JobStatus
 from simulator.region import CyclicZoneGraph, CyclicZoneGraphLocation
 from simulator.vehicle import Vehicle, VehicleStatus
 
 HOUR = 3600
-# Three zones; every leg is under an hour, so each leg ends at the first tick.
+# Zones 1 to 3 are under an hour apart, so each leg between them ends at the first tick.
+# Zone 4 is 1.5 hours from zone 1, like 98 of the 154 zone-to-charger drives in the Chicago map.
 # Distances (km) and times (s) differ per pair, so a leg shows which zone it was costed from.
 LEGS = {
-    (1, 1): (0.5, 100), (1, 2): (2.0, 600), (1, 3): (9.0, 2700),
-    (2, 1): (2.0, 600), (2, 2): (0.5, 100), (2, 3): (4.0, 1200),
-    (3, 1): (9.0, 2700), (3, 2): (4.0, 1200), (3, 3): (0.5, 100),
+    (1, 1): (0.5, 100), (1, 2): (2.0, 600), (1, 3): (9.0, 2700), (1, 4): (30.0, 5400),
+    (2, 1): (2.0, 600), (2, 2): (0.5, 100), (2, 3): (4.0, 1200), (2, 4): (28.0, 5000),
+    (3, 1): (9.0, 2700), (3, 2): (4.0, 1200), (3, 3): (0.5, 100), (3, 4): (25.0, 4500),
+    (4, 1): (30.0, 5400), (4, 2): (28.0, 5000), (4, 3): (25.0, 4500), (4, 4): (0.5, 100),
 }
+ZONES = sorted({a for a, _ in LEGS})
 
 
 @pytest.fixture
 def region(tmp_path):
-    table = {a: {b: {"distance": d, "time": t} for (a2, b), (d, t) in LEGS.items() if a2 == a} for a in (1, 2, 3)}
+    table = {a: {b: {"distance": d, "time": t} for (a2, b), (d, t) in LEGS.items() if a2 == a} for a in ZONES}
     path = tmp_path / "map.pkl"
     path.write_bytes(pickle.dumps(table))
     return CyclicZoneGraph(str(path))
@@ -95,3 +99,33 @@ def test_a_taxi_back_from_recovery_is_at_its_depot(region):
         taxi.tick(HOUR, {"T_a": 25})
     assert taxi.status == VehicleStatus.IDLE
     assert taxi.location.zone == 1
+
+
+def station_at(zone, region, port_kw=10.0):
+    return ChargeStation(CyclicZoneGraphLocation(zone, region), [ChargePort(port_kw, 0.9)], P_max=500)
+
+
+def test_a_charger_more_than_an_hour_away_is_reached_and_the_taxi_charges(region):
+    """step() calls charge() every hour while the flag is on; the drive must still end."""
+    taxi = taxi_at(1, region)
+    taxi.battery.soc = 0.15
+    station = station_at(4, region)
+    soc = []
+    for _ in range(5):
+        taxi.charge(station, 72.1)
+        taxi.tick(HOUR, {"T_a": 25})
+        station.tick([taxi], HOUR, 25)
+        soc.append(taxi.battery.soc)
+
+    assert taxi.status == VehicleStatus.CHARGING
+    assert taxi.location.zone == 4
+    assert station.ports[0].vehicle == taxi.vid and station.ports[0].P_t == 10.0
+    first_plugged_in = next(i for i, (a, b) in enumerate(zip(soc, soc[1:])) if b > a)
+    assert all(b > a for a, b in zip(soc[first_plugged_in:], soc[first_plugged_in + 1:]))  # charges every hour once there
+
+
+def test_a_new_charger_trip_starts_its_timer_from_the_current_zone(region):
+    taxi = taxi_at(1, region)
+    taxi.charge(station_at(4, region), 10.0)
+    assert taxi.status == VehicleStatus.TOCHARGE
+    assert taxi.time_remaining == LEGS[(1, 4)][1]

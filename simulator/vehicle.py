@@ -108,14 +108,22 @@ class Vehicle:
         Assign a vehicle to a <charger> and attempt to charge at
         <preferred_rate> (kW). The preferred rate is not guaranteed, but
         cannot be exceeded during charging.
+
+        step() calls this every tick while the charge flag is on. A vehicle
+        already driving to, or plugged in at, this charger keeps its trip
+        timer and its port.
         """
+        continuing = self.charger is charger and self.status in (
+            VehicleStatus.TOCHARGE, VehicleStatus.CHARGING
+        )
         self.charger = charger
         self.destination = charger.location
-        self.time_remaining = self.location.to(self.destination)[1]
         self.preferred_rate = preferred_rate
-        if self.status != VehicleStatus.CHARGING or self.location != self.destination:
-            self.status = VehicleStatus.TOCHARGE
-            self.charger.disconnect(self.vid)
+        if continuing:
+            return
+        self.time_remaining = self.location.to(self.destination)[1]
+        self.status = VehicleStatus.TOCHARGE
+        self.charger.disconnect(self.vid)
 
     def initialize_recovery_state(self) -> None:
         """

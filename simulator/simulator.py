@@ -143,6 +143,8 @@ class TaxiFleetSimulator(gym.Env):
         closest_job = None
         distance = float('inf')
         for job in self.arrived:
+            if job.status != JobStatus.ARRIVED:  # taken by another taxi earlier in this step
+                continue
             d, t = vehicle.location.to(job.pickup_location)
             #if d == float('inf'):
             #    print(job.pickup_location.region.map[1])
@@ -179,8 +181,10 @@ class TaxiFleetSimulator(gym.Env):
                     energy_change = (c_v / eta * (self.dt / 3600.0)) / self.fleet[idx].battery.initial_capacity
                     self.fleet[idx].battery.soc = max(0.0, self.fleet[idx].battery.soc + energy_change)
                     self.current_grid_power += c_v # Record negative power from V2G
-            elif len(self.arrived) > 0 and self.fleet[idx].status in [VehicleStatus.IDLE, VehicleStatus.CHARGING, VehicleStatus.TOCHARGE]:
-                self.fleet[idx].service_demand(self.get_closest_job(self.fleet[idx]))
+            elif self.fleet[idx].status in [VehicleStatus.IDLE, VehicleStatus.CHARGING, VehicleStatus.TOCHARGE]:
+                job = self.get_closest_job(self.fleet[idx])
+                if job is not None:
+                    self.fleet[idx].service_demand(job)
 
         # Update fleet
         for vehicle in self.fleet:

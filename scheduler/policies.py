@@ -50,7 +50,9 @@ class EightyTwentyPolicy(SchedulePolicy):
     def schedule(self, observation: numpy.array, info: Dict) -> numpy.array:
         action = numpy.zeros((50, 2))
         for v in range(len(info["fleet"])):
-            if observation[v, 1] < 0.2:
+            soc = observation[v, 1]
+            charging = info["fleet"][v]["status"] in ("TOCHARGE", "CHARGING")
+            if soc < 0.2 or (charging and soc < 0.8):
                 action[v, 0] = 1
                 action[v, 1] = 72.1
         return action

@@ -539,8 +539,9 @@ window.createFleetScene = function createFleetScene(ZONES) {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render(true));
 
   // ---- public API
-  // load(trace, meta, {live, total}): show a run. A saved run opens paused on the busiest hour
-  // of its first week; a live run starts empty at hour 0 and grows through append().
+  // load(trace, meta, {live, total, start}): show a run. A saved run opens paused on hour
+  // <start> if given, else the busiest hour of its first week; a live run starts empty at
+  // hour 0 and grows through append().
   function load(trace, meta, opts) {
     const o = opts || {};
     pause();
@@ -558,6 +559,7 @@ window.createFleetScene = function createFleetScene(ZONES) {
     for (let k = 0; k < T.times.length; k++) ingest(k);
     let start = 0;
     if (!LIVE) for (let k = 0; k < Math.min(ready(), 168); k++) if (cityRequests[k] > cityRequests[start]) start = k;
+    if (Number.isInteger(o.start) && o.start >= 0 && o.start < ready()) start = o.start;
     playhead = start;
     timeline.width = 0;
     renderStatic();

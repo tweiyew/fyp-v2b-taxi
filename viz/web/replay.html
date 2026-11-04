@@ -19,6 +19,8 @@ __SCENE_JS__
 <script>
 (function () {
   const read = (id) => JSON.parse(document.getElementById(id).textContent);
-  createFleetScene(read("zones-data")).load(read("trace-data"), read("meta-data"));
+  // Open on a given hour with #h=<hour> in the address, e.g. page.html#h=227.
+  const hour = Number((location.hash.match(/h=(\d+)/) || [])[1]);
+  createFleetScene(read("zones-data")).load(read("trace-data"), read("meta-data"), { start: hour });
 })();
 </script>

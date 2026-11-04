@@ -221,3 +221,6 @@ viz/web/vendor/
 
 # Simulator logs written by make run (regenerated; experiments live in results/)
 logs/
+
+# Paper PDFs (publisher copyright; refs/README.md lists them)
+refs/*.pdf

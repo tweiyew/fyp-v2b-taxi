@@ -33,6 +33,20 @@ The fork runs one month of Chicago (744 hourly ticks) in about 30 seconds, but i
 
 **Not in the code at all (all FYP-new):** building load, a V2B site, a tariff or payment rule, driver agents, a reporting channel. The observation holds only SoC and SoH per taxi, so no policy can see the hour or the building peak.
 
+## Research question (open, 4 Nov)
+
+Not decided. The question has to pass four tests: the answer can't be guessed beforehand; someone would act on it; the data, the simulator and about four months can answer it; and nobody has answered it already (needs a literature check, not yet done).
+
+The August question (do drivers misreport availability under a capacity payment, and does settling on delivered kWh fix it) fails the first test as stated: paying for declared availability invites over-declaring, and paying on delivery removes it. What it lacks is the trade-off: paying on delivery puts the risk on drivers, so fewer take part. The 4 Nov O'Hare check (risk table) adds that, as configured, a fare is always waiting, so lying would cost nearly all V2B energy whatever the rule.
+
+| | Candidate | The unknown it measures | Main cost |
+| --- | --- | --- | --- |
+| Q1 | Which payment rule gets the most V2B energy to the building at its peak when drivers choose what availability to declare? | Where truthfulness and participation balance | Supply and demand at O'Hare must be balanced first |
+| Q2 | How much of an airport-side building's peak can taxis waiting in the airport queue cover, and what does it cost them in fares? | Queue length against the load curve | A queue model; an operations result more than a mechanism one |
+| Q3 | A driver in the airport queue knows roughly when they will reach the front; the building needs those departure times to plan discharge. Can a payment rule make drivers report them truthfully, and how much peak shaving does truth buy? | The value of eliciting private departure times | A queue model and the driver model |
+
+To settle with Wei Yew: which question; how to balance supply and demand (risk table, O'Hare row); what "settle on delivered kWh" means, since flat per-kWh pay is ruled out below.
+
 ## Decisions locked
 
 Run everything on the Chicago data that ships with the fork, with O'Hare as the demand hub and a building load from the same weather station. Four rows change the August proposal; they are marked.
@@ -126,21 +140,26 @@ Agents write and fix code. Plain scripts run the experiments, so every result re
 | P4 | The new rule in code, the same sweeps | Which rule | Same as P3 |
 | P5 | Draft methods text from the code; a number check on your drafts | The argument, and every claim about Paper A or B | A reviewer subagent matches each number in the draft to a results file |
 
-**Setup, half a day on Sat 24 Oct**
+**Setup** (state on 4 Nov)
 
-- [ ] Open Claude Code in your branch of the fork. Review the starter `CLAUDE.md` and keep it short.
-- [ ] Turn `audit_checks.py` into pytest tests under `tests/`. Mark today's bugs as expected failures so each fix has a target.
-- [ ] Write `run.py`: one config in, one `results/<run-id>/` folder out holding `config.yaml`, `metrics.json` and the commit id.
+- [x] Claude Code in the repo, with a project `CLAUDE.md` (gitignored). Work happens on `main`; the `fyp-v2b` branch was not made.
+- [x] Tests under `tests/` (50 on 4 Nov). `audit_checks.py` never existed; each P0 fix got a test that failed first instead.
+- [x] One config in, one `results/<run-id>/` out: `make trace` (`viz/trace.py`) in place of `run.py`. A sweep script over many configs is still needed for P3.
 - [ ] Put the three papers as text in `refs/` so agents can search them.
 - [ ] Add two subagents in `.claude/agents/`: `reviewer` (read-only tools; checks a diff against this plan and the audit) and `paper-checker` (read-only; checks any sentence about Paper A or B against `refs/`).
 - [ ] Optional: a Stop hook that runs `pytest -q`, so no session ends on a failing suite.
 
-**One task, start to finish**
+**One task, start to finish** (the loop P0 used, 3 to 4 Nov)
 
-1. Plan mode (Shift+Tab): "Read `simulator/vehicle.py` and `tests/test_charging.py`. Plan the fix for audit row 1. Don't edit yet."
-2. Approve the plan, then set the stop condition: `/goal tests/test_charging.py passes and no other test file changed`.
-3. "Use the reviewer subagent on this diff." Read the diff yourself, then merge.
-4. Run sweeps from the terminal with the script. Afterwards, ask the agent to summarise `results/` into a table.
+1. The agent reads the code and states what is wrong, with file and line.
+2. It writes a test, runs it, and shows it failing on today's code.
+3. It shows the fix as a diff. You approve or reject; nothing is applied before that.
+4. It applies the fix, runs the whole suite, and commits that fix alone.
+5. It runs a January month in memory and compares with the last baseline. A surprise is investigated before moving on: in P0, bug 2's fix exposed bug 1 (drives over an hour never ended) and bug 1's exposed bug 8 (98% of busy taxi-hours on shared jobs).
+6. Push when `main` is in a sound state, not between dependent fixes.
+7. Record the run with `make trace` from a clean tree, then summarise `results/` into a table.
+
+A `/goal` stop condition (`/goal tests/test_<name>.py passes and no other test file changed`) and the reviewer subagent fit steps 2 to 4 for unattended work; P0 ran interactively without them.
 
 **Guardrails**
 
@@ -148,6 +167,7 @@ Agents write and fix code. Plain scripts run the experiments, so every result re
 - The utility function, the payment rules and the thresholds are the thesis. An agent can propose; you decide.
 - A figure enters the report only if its `results/` folder exists and reruns to the same numbers.
 - After two failed corrections in one session, `/clear` and rewrite the task.
+- A metric that moves the wrong way after a fix is explained from the trace before it goes in a table (e.g. the 80-20 fix raised trips because charging sessions fell from 2,443 to 645).
 
 Docs: [best practices](https://code.claude.com/docs/en/best-practices), [subagents](https://code.claude.com/docs/en/sub-agents), [/goal](https://code.claude.com/docs/en/goal), [non-interactive runs](https://code.claude.com/docs/en/headless).
 
@@ -159,7 +179,8 @@ The biggest risk is P2 producing a trivial equilibrium. The project still stands
 | --- | --- | --- |
 | P2 equilibrium is trivial: every driver lies the maximum or never lies | The one-driver check, 20 Dec | Switch to the commitment-window rule from August, or add driver types that value fares differently |
 | The public code is not what produced the paper, so the paper's numbers cannot be matched | Raditya's answer to question 1 | Report your fixed simulator as your baseline. The fixes become a short methods section, which is a contribution in its own right |
-| More upstream bugs surface during P0 | V1G run on 1 Nov | Freeze the minimum: movement and charging. Leave fidelity issues like duplicate pickups as noted limitations |
+| More upstream bugs surface during P0 | V1G run on 1 Nov | Happened: duplicate pickups were fixed after all (they hid 86% of trips: 2,212 completed before the fix, 15,672 after); station energy logging and the demand reader are noted in `docs/P0_PLAN.md` and left for later |
+| Supply is far below demand: 98.6% of O'Hare requests go unserved and a fare is always waiting, so V2B always costs a sure fare and the honest-vs-lying comparison is degenerate (found 4 Nov) | Now | Wei Yew to choose: A, model the O'Hare taxi queue; B, a bigger fleet (remove the hard-coded 50); C, give the 50 taxis their fleet's share of the trips; D, keep it and accept a degenerate comparison |
 | The office peak misses the hours taxis dwell at O'Hare | First P1 plot | Large hotel profile, or move the V2B window to the evening |
 | January is winter, so an examiner asks about cooling peaks | Interim report feedback | The tropical-profile sensitivity run. A July 2019 Chicago month only if P4 is done |
 | P1 slips past exams | 22 Nov | Cut P1 to one V2B site, one fixed discharge rate and one threshold rule. Nothing later needs more |

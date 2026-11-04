@@ -1,0 +1,18 @@
+{
+  "run_id": "20261104-v1g-eightytwenty-p0",
+  "config": "configs/chicago_v1g.yaml",
+  "policy": "EIGHTYTWENTY",
+  "weights": null,
+  "commit": "9cc5afb3f308725bcd33b36c509fba196a552c9f",
+  "uncommitted_changes": false,
+  "created": "2026-11-04T10:56:50",
+  "hours": 744,
+  "requests": 606052,
+  "trips_completed": 16591,
+  "requests_rejected": 588162,
+  "trips_failed": 0,
+  "grid_energy_kwh": 35280.0,
+  "taxi_zone_changes": 21763,
+  "taxi_hours_in_recovery": 0,
+  "mean_final_soh": 0.9980842
+}

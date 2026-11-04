@@ -68,11 +68,11 @@ The August phases P0 to P5 stay, with the same goals. P0 grows: it now means fix
 **P0 tasks, in order**
 
 - [ ] Branch the fork (`fyp-v2b`) and do the agent setup in "Running the work with agents" (half a day)
-- [ ] `Vehicle.tick()`: set `location = destination` on every arrival (bug 2)
-- [ ] `Vehicle.charge()`: compare zones, and keep the trip timer when the target charger is unchanged (bug 1)
-- [ ] 80-20 policy: hold the charge flag until SoC reaches 0.8
-- [ ] `get_closest_job()`: skip jobs already assigned this tick (bug 8)
-- [ ] Rerun January with V1G and record the baseline table
+- [x] `Vehicle.tick()`: set `location = destination` on every arrival (bug 2)
+- [x] `Vehicle.charge()`: compare zones, and keep the trip timer when the target charger is unchanged (bug 1)
+- [x] 80-20 policy: hold the charge flag until SoC reaches 0.8
+- [x] `get_closest_job()`: skip jobs already assigned this tick (bug 8)
+- [x] Rerun January with V1G and record the baseline table (4 Nov: `docs/P0_PLAN.md`, As built)
 - [ ] Send Raditya the audit table and the questions at the end of this file
 
 ## Timeline

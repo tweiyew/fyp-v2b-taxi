@@ -1,6 +1,41 @@
 # Plan: P0, fix the base simulator (3 to 5 Nov)
 
-Written 3 Nov 2026. Goal: by the 5 Nov group presentation, the January V1G run charges energy, taxis change zones, and there is a before/after baseline table for the implementation slide (`docs/PLAN.md:97`). Line numbers are as of commit `cf3722f`.
+Written 3 Nov 2026. Status: done 4 Nov (see "As built").
+
+## As built (4 Nov)
+
+Five fixes, each with a test that failed first: `b24171d` (bug 2), `d8032f9` (bug 1), `fb37b16` (bug 8), `f4e93df` (repeatable runs), `9cc5afb` (80-20 holds to 80%). 50 tests pass. Decision 1: sort by job id (Wei Yew, 3 Nov), done as a tie-break inside `get_closest_job()`, which gives the same order without sorting the pool every call.
+
+January, `chicago_v1g`, 80-20 policy, 50 taxis:
+
+| | Before: `results/20261023-v1g-eightytwenty-baseline` (commit `1aa83f1`) | After: `results/20261104-v1g-eightytwenty-p0` (commit `9cc5afb`) |
+| --- | --- | --- |
+| Trips completed | 4,046 | 16,591 |
+| Requests no taxi took | 600,727 of 606,079 | 588,162 of 606,052 |
+| Energy drawn by stations | 0 kWh | 35,280 kWh (33,456 kWh reached batteries) |
+| Taxi zone changes | 0 | 21,763 |
+| Taxi-hours out of charge (RECOVERY) | 3,809 | 0 |
+| Mean SoH after the month | 0.99877 | 0.99808 |
+
+The P0 "done when" holds: charging power is nonzero, taxis change zones, RECOVERY is 0. Runs repeat exactly: two January runs in separate processes give the same metrics and the same hour-by-hour trace. Slide images: `docs/figures/<run-id>.png`, both at hour 227 (Thu 10 Jan, 11:00), from `viz/out/<run-id>.html#h=227`.
+
+What each fix did to the month (in-memory runs between commits):
+
+| After | Trips completed | Station kWh | Note |
+| --- | --- | --- | --- |
+| Bug 2 | 592 | 4,250 | Taxis now drive to chargers, and drives over an hour never ended (bug 1) |
+| + bug 1 | 2,212 | 43,440 | 98% of busy taxi-hours were on a job another taxi also held (bug 8) |
+| + bug 8 | 15,672 | 45,240 | |
+| + job-id ties | 15,648 | 45,300 | |
+| + 80-20 to 80% | 16,591 | 35,280 | Charging sessions fell from 2,443 to 645, so far less driving to chargers |
+
+Found on the way, not fixed (not in P0):
+- Stations log the port's full power for the hour even when the battery fills partway through it, so station kWh overstates battery kWh by 5% (1,824 kWh) after the 80-20 fix.
+- `ReplayDemand.tick()` adds the first trip of the next hour to the current one, and the row read in `__init__` is never used (likely why requests exceed the 604,163 trips).
+- `ReplayDemand.seek()` recurses forever if the file starts after `start t` (the shipped data starts at 00:00, so real runs are safe).
+- 50 taxis still turn away 97% of requests: the fleet-size question.
+
+Goal: by the 5 Nov group presentation, the January V1G run charges energy, taxis change zones, and there is a before/after baseline table for the implementation slide (`docs/PLAN.md:97`). Line numbers are as of commit `cf3722f`.
 
 ## How each fix is done
 
